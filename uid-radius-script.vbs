@@ -317,7 +317,7 @@ Function ProcessDTSLog
 									strXMLLine = "<uid-message><version>1.0</version><type>update</type><payload><login>"
 
 									If blnAgent = 1 Then
-										strXMLLine = strXMLLine & "<entry name=""" & strDomain & "\" & strUser & """ ip=""" & strAddress & """/
+										strXMLLine = strXMLLine & "<entry name=""" & strDomain & "\" & strUser & """ ip=""" & strAddress & """/>"
 									Else
 										If strProxy = "1" Then
 						                    			strXMLLine = strXMLLine & "<entry name=""" & strDomain & "\" & strEventUser & """ ip=""" & strAddress & """ timeout=""" & strTimeout & """ vsys=""" & strVsys & """/>"
