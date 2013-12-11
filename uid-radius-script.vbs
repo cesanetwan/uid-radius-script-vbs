@@ -5,11 +5,15 @@
 ' copyright notice and this permission notice appear in all copies.
 
 ' Alterations to use RADIUS accounting logs/DHCP leases over Kiwi/syslog 
-' v5.5
+' v5.6
 ' Gareth Hill
 
 ' Changelog:
 
+strVersion = "5.6vbs"
+
+' v5.6
+'   * Submits script version when submitting to XML API
 ' v5.5
 '   * Support for the XML API proxy by way of flag, modified post data to include source vsys
 ' v5.1 
@@ -314,7 +318,11 @@ Function ProcessDTSLog
 										objDebugLog.writeLine("Not machine auth event")
 									End If
 
-									strXMLLine = "<uid-message><version>1.0</version><type>update</type><payload><login>"
+									If strProxy = "1" Then
+                                                                                strXMLLine = "<uid-message><version>1.0</version><scriptv>" & strVersion & "</scriptv><type>update</type><payload><login>"
+                                                                        Else
+                                                                                strXMLLine = "<uid-message><version>1.0</version><type>update</type><payload><login>"
+                                                                        End If
 
 									If blnAgent = 1 Then
 										strXMLLine = strXMLLine & "<entry name=""" & strDomain & "\" & strUser & """ ip=""" & strAddress & """/>"
@@ -388,7 +396,11 @@ Function ProcessIASLog
 											objDebugLog.writeLine("Not machine auth event")
 										End If
 
-										strXMLLine = "<uid-message><version>1.0</version><type>update</type><payload><login>"
+										If strProxy = "1" Then
+                        	                                                        strXMLLine = "<uid-message><version>1.0</version><scriptv>" & strVersion & "</scriptv><type>update</type><payload><login>"
+                	                                                        Else
+        	                                                                        strXMLLine = "<uid-message><version>1.0</version><type>update</type><payload><login>"
+	                                                                        End If
 
 										If blnAgent = 1 Then
 											strXMLLine = strXMLLine & "<entry name=""" & strDomain & "\" & strUser & """ ip=""" & strAddress & """/>"
@@ -489,7 +501,12 @@ Function ProcessDHCPClients
 
 			If UBound(arrMatchedIPAddresses) >= -1 Then
 				For Each strAddress in arrMatchedIPAddresses
-					strXMLLine = "<uid-message><version>1.0</version><type>update</type><payload><login>"
+					If strProxy = "1" Then
+	                                       strXMLLine = "<uid-message><version>1.0</version><scriptv>" & strVersion & "</scriptv><type>update</type><payload><login>"
+                                        Else
+                                               strXMLLine = "<uid-message><version>1.0</version><type>update</type><payload><login>"
+                                        End If
+
 
 					If blnAgent = 1 Then
 						    strXMLLine = strXMLLine & "<entry name=""" & strDomain & "\" & strEventUser & """ ip=""" & strAddress & """/>"
