@@ -478,6 +478,7 @@ Function ProcessDHCPClients
 					objDebugLog.writeLine("Calling station is IP, no DHCP lookup required")
 				End If
 
+				Redim Preserve arrMatchedIPAddresses(1)
 				arrMatchedIPAddresses(0) = strCallingStation
 			Else
 				Set oRe=New RegExp 
