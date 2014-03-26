@@ -10,11 +10,8 @@
 
 ' Changelog:
 
-strVersion = "5.7vbs"
+strVersion = "5.6vbs"
 
-' v5.7
-'   * Supports users in the format user@domain
-'   * Fixed issue where events triggered with Framed-IP as Calling Station in Windows Event (ie WebAuth) weren't submitting.
 ' v5.6
 '   * Submits script version when submitting to XML API
 ' v5.5
