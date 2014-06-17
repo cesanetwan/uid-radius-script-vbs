@@ -9,7 +9,7 @@
 <AgentServer>127.0.0.1</AgentServer>
 <AgentPort>5006</AgentPort>
 <Debug>1</Debug>
-<DHCPServer>apollo</DHCPServer>
+<DHCPServer>DHCPHostname</DHCPServer>
 <Key>key</Key>
 <VSYS>vsys123</VSYS>
 <Agent>0</Agent>
