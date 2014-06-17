@@ -16,4 +16,5 @@
 <Timeout>120</Timeout>
 <Proxy>1</Proxy>
 <PostAddr>https://xml-proxy.address.com/api/mapping</PostAddr>
+<Multipass>0</Multipass>
 </user-id-script-config>
