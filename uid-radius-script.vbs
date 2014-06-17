@@ -5,13 +5,15 @@
 ' copyright notice and this permission notice appear in all copies.
 
 ' Alterations to use RADIUS accounting logs/DHCP leases over Kiwi/syslog 
-' v5.6
+' v5.8
 ' Gareth Hill
 
 ' Changelog:
 
-strVersion = "5.7vbs"
+strVersion = "5.8vbs"
 
+' v5.8
+'   * Supports a second pass over DHCP for use in situations wherein the script is executing before a lease is granted to a workstation.
 ' v5.7
 '   * Supports users in the format user@domain
 '   * Fixed issue where events triggered with Framed-IP as Calling Station in Windows Event (ie WebAuth) weren't submitting.
@@ -60,7 +62,7 @@ ptrn = "<Timestamp data_type=\S4\S>.+(\d\d:\d\d:\d\d)\.\d+</Timestamp>.*<User-Na
 ptrnDHCP= "<Timestamp data_type=\S4\S>.+(\d\d:\d\d:\d\d)\.\d+</Timestamp>.*<User-Name data_type=\S1\S>(.+)</User-Name>.*<Calling-Station-Id data_type=\S1\S>(.+)</Calling-Station-Id>"
 strFileName = "IN" & right(year(date()),2) & right("0" & month(date()),2) & right("0" & day(date()),2) & ".log" '//The log name for the date in question
 Dim arrExclusions(), aClientIPS(), arrDHCPServer(), arrFoundInScope(), arrMatchedIPAddresses()
-Dim strDomain, strLogPath, strLogFormat, strAgentServer, strAgentPort, strDHCPServer, strVsys, blnAgent, strAPIKey, strTimeout, debug, intMacsFound
+Dim strDomain, strLogPath, strLogFormat, strAgentServer, strAgentPort, strDHCPServer, strVsys, blnAgent, strAPIKey, strTimeout, debug, intMacsFound, strMultipass
 Dim strStartTime, strEndTime, strProxy, strPostAddr
 Set xmlDoc = CreateObject("Microsoft.XMLDOM")
 xmlDoc.Async = "False"
@@ -487,6 +489,8 @@ Function ProcessDHCPClients
 				oRe.Pattern= "\s(\d+\.\d+\.\d+\.\d+)\s*-\s\d+\.\d+\.\d+\.\d+\s*-Active"
 				intMacsFound = 0
 
+				Redim Preserve arrMatchedIPAddresses(-1)
+
 				For Each DHCPServer in arrDHCPServer
 					strDHCPServer = DHCPServer
 
@@ -523,7 +527,7 @@ Function ProcessDHCPClients
 				Next
 			End If
 
-			If UBound(arrMatchedIPAddresses) >= -1 Then
+			If UBound(arrMatchedIPAddresses) > -1 Then
 				For Each strAddress in arrMatchedIPAddresses
 					If strProxy = "1" Then
 	                                       strXMLLine = "<uid-message><version>1.0</version><scriptv>" & strVersion & "</scriptv><type>update</type><payload><login>"
@@ -546,8 +550,82 @@ Function ProcessDHCPClients
 					PostToAgent(strXMLLine) '//Send the relevant UID details to User-Agent
 				Next
 			Else
-				If debug > 0 Then
-					objDebugLog.writeLine("MAC not found, no data posted")
+				If strMultipass = 0 Then
+					If debug > 0 Then
+						objDebugLog.writeLine("MAC not found, no data posted")
+					End If
+				Else
+					If debug > 0 Then
+						objDebugLog.writeLine("Second DHCP Pass")
+					End If
+
+					Set oRe=New RegExp 
+					Set oShell = CreateObject("WScript.Shell") 
+					oRe.Global=True
+					oRe.Pattern= "\s(\d+\.\d+\.\d+\.\d+)\s*-\s\d+\.\d+\.\d+\.\d+\s*-Active"
+					intMacsFound = 0
+
+					For Each DHCPServer in arrDHCPServer
+						strDHCPServer = DHCPServer
+
+						If debug = 2 Then
+							objDebugLog.writeLine("DHCP Server: " + strDHCPServer)
+							objDebugLog.writeLine("Defining scopes:")
+						End If
+
+						Set oScriptExec = oShell.Exec("netsh dhcp server \\" & strDHCPServer & " show scope") 
+						Set o=oRe.Execute(oScriptExec.StdOut.ReadAll) 
+
+						For i=0 To o.Count-1
+ 							Redim Preserve arrScopes(i)
+ 							arrScopes(i) = o(i).SubMatches(0)
+
+							If debug = 2 Then
+								objDebugLog.writeLine("       " & arrScopes(i))
+							End If
+						Next
+
+						CleanMac strCallingStation
+
+						If debug = 2 Then
+							objDebugLog.writeLine("Searching DHCP leases for " & strCallingStation)
+						End If
+
+						For Each scope in arrScopes
+							If debug = 2 Then
+								objDebugLog.writeLine("       " & "SCOPE: " & scope)
+							End If
+
+    							FindMac scope, strCallingStation
+						Next
+					Next
+
+					If UBound(arrMatchedIPAddresses) >= -1 Then
+						For Each strAddress in arrMatchedIPAddresses
+							If strProxy = "1" Then
+	                        	strXMLLine = "<uid-message><version>1.0</version><scriptv>" & strVersion & "</scriptv><type>update</type><payload><login>"
+                            Else
+                            	strXMLLine = "<uid-message><version>1.0</version><type>update</type><payload><login>"
+                            End If
+
+							If blnAgent = 1 Then
+								strXMLLine = strXMLLine & "<entry name=""" & strDomain & "\" & strEventUser & """ ip=""" & strAddress & """/>"
+							Else
+								If strProxy = "1" Then
+									strXMLLine = strXMLLine & "<entry name=""" & strDomain & "\" & strEventUser & """ ip=""" & strAddress & """ timeout=""" & strTimeout & """ vsys=""" & strVsys & """/>"
+								Else
+									strXMLLine = strXMLLine & "<entry name=""" & strDomain & "\" & strEventUser & """ ip=""" & strAddress & """ timeout=""" & strTimeout & """/>"
+								End If
+							End If
+
+							strXMLLine = strXMLLine & "</login></payload></uid-message>"
+							PostToAgent(strXMLLine) '//Send the relevant UID details to User-Agent
+						Next
+					Else
+						If debug > 0 Then
+							objDebugLog.writeLine("MAC not found, no data posted")
+						End If
+					End If
 				End If
 			End If
 		Else
@@ -606,6 +684,8 @@ Function LoadConfig
 	Set objItem = xmlDoc.selectSingleNode("/user-id-script-config/PostAddr")
 	strPostAddr = objItem.text
 	count = 0
+	Set objItem = xmlDoc.selectSingleNode("/user-id-script-config/Multipass")
+	strMultipass = objItem.text
 End Function
 
 '//
@@ -720,5 +800,8 @@ Function CreateDefaultConfig
 	Set objPostAddr = xmlDoc.createElement("PostAddr")
 	objPostAddr.text = "https://cefilter-api.cesa.catholic.edu.au/api/mapping"
 	objCFG.appendChild objPostAddr
+	Set objMultipass = xmlDoc.createElement("Multipass")
+	objMultipass.text = "0"
+	objCFG.appendChild objMultipass
 	xmlDoc.Save "C:\Program Files (x86)\Palo Alto Networks\User-ID Agent\UIDConfig.xml"
 End Function
